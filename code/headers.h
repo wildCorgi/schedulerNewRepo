@@ -52,6 +52,7 @@ typedef struct PCB
     pid_t forkID;
     int remainingTime;
     int lastStoppedTime;
+    int memSize;
 } PCB;
 
 

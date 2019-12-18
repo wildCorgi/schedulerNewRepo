@@ -348,7 +348,7 @@ void writeFinalState()
                     for(int i = 0 ; i<count;i++)
                     {
                             deviation += pow((dequeueN(npq) - (AWTA)),2);
-                            printf("deviation is %.2f\n",deviation);
+                           
                     }
                     deviation = sqrt(deviation/count);
                     char printString[200];
