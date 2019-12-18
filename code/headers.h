@@ -53,6 +53,8 @@ typedef struct PCB
     int remainingTime;
     int lastStoppedTime;
     int memSize;
+    int mStart;
+    int mEnd;
 } PCB;
 
 

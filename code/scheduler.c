@@ -1,4 +1,5 @@
 #include "queue.c"
+#include "tree.c"
 #include <time.h>
 #include <math.h>
 void processDone(int);
@@ -11,6 +12,7 @@ int quantum ;
 int lastT;
 int finishedProcesses =0;
 int PCBRCV;
+bool alloc;
 bool smallerRecieved;
 int processID;
 int totalRTime = 0;
@@ -21,14 +23,18 @@ node * looper;
 struct PCB  temp;
 FILE *outputFile;
 FILE *outputFile1;
+FILE *outputFile2;
+FILE *outputFile3;
 queue * pq;
 nqueue * npq;
+struct treeNode * tree;
 msgPBuff receivedInfo;
 
 
 void createMessageQueue(int *msgID,int ID);
 void writeStarting();
 void writeStartState();
+
 void writeFinishState();
 void writeResumeState();
 void writeFinalState();
@@ -64,7 +70,7 @@ int main(int argc, char *argv[])
             algo = atoi(argv[1]);
             quantum = atoi(argv[2]); 
             processesNumber = atoi(argv[3]);
-
+            alloc = atoi(argv[4]);
 
             initClk();
             
@@ -222,7 +228,7 @@ void doRR()
                     { 
 
                         setStartState();
-                        lastT = y;
+                        lastT = x;
                         char str[64];
                         sprintf(str, "%d", temp.remainingTime);
                         writeStartState();
@@ -230,7 +236,7 @@ void doRR()
                     }
 
                     setStartState();
-                    lastT = y;
+                 
                     if(quantum < temp.remainingTime)
                     { 
                         alarm(quantum);
@@ -239,6 +245,7 @@ void doRR()
                 }
                 else
                 {
+                    lastT = x;
                     setResumeState();
                     writeResumeState();
                     if(quantum < temp.remainingTime)
@@ -296,6 +303,15 @@ void createMessageQueue(int *msgID,int ID)
 
 void writeStarting()
 {
+    if(alloc)
+    {
+            char printString1[120];
+            outputFile3 = fopen("./memory.log", "a");
+            sprintf(printString1,"#At time x allocated y bytes for process z from i t o j\n"); 
+            fwrite(printString1, sizeof(char), strlen(printString1), outputFile3);
+            fclose(outputFile3);
+    }
+
     outputFile = fopen("./scheduler.log", "a");
     char outputString[] = "#At time x process y state arr w total z remain y wait k\n";
     fwrite(outputString, 1, strlen(outputString), outputFile);
@@ -303,6 +319,15 @@ void writeStarting()
 }
 void writeStartState()
 {
+        if(alloc)
+    {
+            allocate(tree,temp.memSize,&temp);
+            char printString1[120];
+            outputFile2 = fopen("./memory.log", "a");
+            sprintf(printString1,"At time %d allocated %d bytes for process %d from %d to %d\n",  y, temp.memSize, temp.processID ,temp.mStart ,temp.mEnd); 
+            fwrite(printString1, sizeof(char), strlen(printString1), outputFile2);
+            fclose(outputFile2);
+    }
         char printString[120];
        
         outputFile = fopen("./scheduler.log", "a");
@@ -341,19 +366,19 @@ void writeResumeState()
 void writeFinalState()
 {
   
-                    double AWTA = (double)(TWTA/processesNumber);
+                    double ATWA = (double)(TWTA/processesNumber);
                     y = getClk();
                     int count = npq->count;
 
                     for(int i = 0 ; i<count;i++)
                     {
-                            deviation += pow((dequeueN(npq) - (AWTA)),2);
+                            deviation += pow((dequeueN(npq) - (ATWA)),2);
                            
                     }
                     deviation = sqrt(deviation/count);
                     char printString[200];
                     outputFile1 = fopen("./scheduler.perf", "a");
-                    sprintf(printString,"CPU Utilization = %.2f %% \nAvg WTA = %.2f\nAvg Waiting = %.2f\nStd WTA = %.2f \n",((double)totalRTime/(double)y)*100,AWTA,((double)totalWaiting/(double)processesNumber),deviation); 
+                    sprintf(printString,"CPU Utilization = %.2f %% \nAvg WTA = %.2f\nAvg Waiting = %.2f\nStd WTA = %.2f \n",((double)totalRTime/(double)y)*100,ATWA,((double)totalWaiting/(double)processesNumber),deviation); 
                     fwrite(printString, sizeof(char), strlen(printString), outputFile1);
                     fclose(outputFile1); 
                                     
@@ -565,13 +590,15 @@ void recieveRR()
 void alarmREC(int signnum)
 {   
 
-                            alarm(0);
-                            setPauseState();
-                            temp.remainingTime -= (y-lastT);
-                            writePauseState();
-                            enqueue(pq,temp);
-                            kill(temp.forkID,SIGSTOP);  
-                            signal(SIGALRM,alarmREC);
+
+
+            alarm(0);
+            setPauseState();
+            temp.remainingTime -= (y - lastT);
+            writePauseState();
+            enqueue(pq, temp);
+            kill(temp.forkID, SIGSTOP);
+            signal(SIGALRM, alarmREC);
 }
 
 
