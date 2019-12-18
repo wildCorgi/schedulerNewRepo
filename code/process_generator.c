@@ -10,11 +10,13 @@ void sendAlgoNumber(int algoMsgID, int schedulingAlgo);
 void schedulerDone(int);
 int main(int argc, char *argv[])
 {
+
     signal(SIGINT, clearResources);
+    
     int schedulingAlgo = -1;
     int quantum = 0;
     int processesNumber = 0 ;
-  
+    int alloc = -1;
     PCB * pcbs = (PCB*)malloc(1000* sizeof(PCB)); 
 
     // TODO Initialization
@@ -26,6 +28,11 @@ int main(int argc, char *argv[])
     processesNumber = readFile(pcbs);
 
     // 2. Ask the user for the chosen scheduling algorithm and its parameters, if there are any.
+    while(alloc<0 || alloc>1)
+    {
+        printf("\nWould you like to allocate memory? (1-Yes,0-No)\n");
+        scanf("%d", &alloc);
+    }
 
     while (schedulingAlgo < 1 || schedulingAlgo > 3)
     {
@@ -73,8 +80,9 @@ int main(int argc, char *argv[])
         sprintf(str1, "%d", quantum);
         char str2[64];
         sprintf(str2, "%d", processesNumber);
-
-        execl("./scheduler.out", "scheduler.out", str,str1,str2,NULL);
+        char str3[64];
+        sprintf(str3, "%d", alloc);
+        execl("./scheduler.out", "scheduler.out", str,str1,str2,str3,NULL);
     }
 
     // 4. Use this function after creating the clock process to initialize clock
@@ -149,7 +157,7 @@ void createMessageQueue(int *msgID, int ID)
 int readFile(PCB * pcbs )
 {
     int i=0;
-    int info[4];
+    int info[5];
     FILE *fp;
     fp = fopen("processes.txt", "r");
     char line[256];
@@ -157,7 +165,7 @@ int readFile(PCB * pcbs )
     {
         if (line[0] != '#')
         {
-            sscanf(line, "%d\t%d\t%d\t%d", &info[0], &info[1], &info[2], &info[3]);
+            sscanf(line, "%d\t%d\t%d\t%d\t%d", &info[0], &info[1], &info[2], &info[3],&info[4]);
             struct PCB temp;
             temp.processID = info[0];
             temp.arrivalTime = info[1];
@@ -167,6 +175,7 @@ int readFile(PCB * pcbs )
             temp.forked=false;
             temp.lastStoppedTime =info[1];
             temp.state=0;
+            temp.memSize = info[4];
             pcbs[i] = temp;
             i++;
         }
