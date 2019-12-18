@@ -1,5 +1,4 @@
 #include "queue.c"
-#include "tree.c"
 #include <time.h>
 #include <math.h>
 void processDone(int);
@@ -13,6 +12,7 @@ int lastT;
 int finishedProcesses =0;
 int PCBRCV;
 bool alloc;
+bool full;
 bool smallerRecieved;
 int processID;
 int totalRTime = 0;
@@ -26,14 +26,25 @@ FILE *outputFile1;
 FILE *outputFile2;
 FILE *outputFile3;
 queue * pq;
+Alloc * allocationArray;
 nqueue * npq;
-struct treeNode * tree;
+
 msgPBuff receivedInfo;
 
-
+void createAllocationArray();
 void createMessageQueue(int *msgID,int ID);
 void writeStarting();
 void writeStartState();
+
+
+int getParent(int index);
+int getSibiling(int index);
+int getLeftChild(int index);
+int getRightChild(int index);
+void setTreeAllocated(int root);
+void setTreeUnallocated(int root);
+int getTheINDEX();
+void merge(int index);
 
 void writeFinishState();
 void writeResumeState();
@@ -47,7 +58,8 @@ void firstRecieveRR();
 void secondRecieve();
 void secondRecievePr();
 void recieveRR();
-
+bool allocate();
+bool deAllocate();
 
 void doHPF();
 void doSRTN();
@@ -60,11 +72,12 @@ int main(int argc, char *argv[])
             signal(SIGALRM,alarmREC);
             pq = createQueue();
             npq = createNQueue();
-            
+            allocationArray  = (Alloc*)malloc(2047* sizeof(Alloc)); 
+            full =false;
             //TODO implement the scheduler :)
             //upon termination release the clock resources
-
-
+            initClk();    
+            createAllocationArray();
             createMessageQueue(&processID, processQueueID);
             
             algo = atoi(argv[1]);
@@ -72,7 +85,7 @@ int main(int argc, char *argv[])
             processesNumber = atoi(argv[3]);
             alloc = atoi(argv[4]);
 
-            initClk();
+            
             
 
             if (algo == 1)
@@ -307,7 +320,7 @@ void writeStarting()
     {
             char printString1[120];
             outputFile3 = fopen("./memory.log", "a");
-            sprintf(printString1,"#At time x allocated y bytes for process z from i t o j\n"); 
+            sprintf(printString1,"#At time x allocated y bytes for process z from i to j\n"); 
             fwrite(printString1, sizeof(char), strlen(printString1), outputFile3);
             fclose(outputFile3);
     }
@@ -319,12 +332,11 @@ void writeStarting()
 }
 void writeStartState()
 {
-        if(alloc)
+    if(alloc && !full)
     {
-            allocate(tree,temp.memSize,&temp);
             char printString1[120];
             outputFile2 = fopen("./memory.log", "a");
-            sprintf(printString1,"At time %d allocated %d bytes for process %d from %d to %d\n",  y, temp.memSize, temp.processID ,temp.mStart ,temp.mEnd); 
+            sprintf(printString1,"At time %d allocated %d bytes for process %d from %d to %d\n",y,temp.memSize,temp.processID,temp.mStart,temp.mEnd); 
             fwrite(printString1, sizeof(char), strlen(printString1), outputFile2);
             fclose(outputFile2);
     }
@@ -338,6 +350,15 @@ void writeStartState()
 }
 void writeFinishState()
 {
+    if(alloc)
+    {
+            char printString1[120];
+            outputFile2 = fopen("./memory.log", "a");
+            sprintf(printString1,"At time %d deallocated %d bytes for process %d from %d to %d\n",y,temp.memSize,temp.processID,temp.mStart,temp.mEnd); 
+            fwrite(printString1, sizeof(char), strlen(printString1), outputFile2);
+            fclose(outputFile2);
+            full =false;
+    }
                     char printString[200];
                     outputFile = fopen("./scheduler.log", "a");
                     sprintf(printString,"At time %d process %d finished arr %d total %d remain %d wait %d TA %d WTA %.2f\n",y, temp.processID, temp.arrivalTime, temp.runTime,0, temp.waitingTime,temp.TA,temp.WTA); 
@@ -394,10 +415,16 @@ void setStartState()
                     temp.remainingTime = temp.runTime;
                     temp.finishTime = 0;
                     temp.lastStoppedTime = y;
+                    if(alloc)
+                    {
+                        full = allocate(&temp);
+                    }
+                    
 }
 void setFinishState()
 {
                     y = getClk();
+                    deAllocate();
                     finishedProcesses++;
                     temp.state = stateFinished;
                     temp.finishTime = y;
@@ -601,4 +628,171 @@ void alarmREC(int signnum)
             signal(SIGALRM, alarmREC);
 }
 
+
+
+
+
+
+
+void createAllocationArray()
+{
+        int n = 1;
+        int index;
+       
+        while(n<1024)
+        {
+            index=n-1;
+            for(int i =0 ; i<n;i++)
+            {
+                allocationArray[index+i].TotalSize = (1024/n);
+                //allocationArray[index+i].nAllocated=0;
+                allocationArray[index+i].allocated=false;
+                allocationArray[index+i].start=(1024/n)*i;
+                allocationArray[index+i].end = (1024/n)*(i+1)-1;
+                allocationArray[index+i].pid = -1;
+
+            }
+            n=n*2;
+        }
+
+
+}
+
+bool allocate()
+{
+    int aIndex = getTheINDEX(temp.memSize);
+    if(aIndex!=-1)
+    {
+        temp.mStart = allocationArray[aIndex].start;
+        temp.mEnd = allocationArray[aIndex].end;
+        allocationArray[aIndex].pid = temp.processID;
+
+        int parent = getParent(aIndex);
+        while(parent>0)
+        {
+            allocationArray[parent].allocated = true;
+            parent = getParent(parent);   
+        }
+        
+        setTreeAllocated(aIndex);
+        return false;
+    }
+    else
+    {
+        printf("MemoryFull\n");
+        return true;
+    }
+}
+bool deAllocate()
+{
+    int index = ceil(log2(temp.memSize));
+    index = pow(2,index);
+    index = (1024/index)-1;
+
+    int TS = allocationArray[index].TotalSize ;
+    while(TS == allocationArray[index].TotalSize)
+    {
+        if(allocationArray[index].pid == temp.processID)
+        {
+            setTreeUnallocated(index);
+            allocationArray[index].pid=-1 ;
+            //allocationArray[index].allocated = false;
+            merge(index);
+            return 1;
+        
+        }
+        index++;
+    }
+    return 0; 
+}
+
+
+
+int getParent(int index)
+{
+    return ((index-1)/2);
+}
+
+int getLeftChild(int index)
+{
+    return ((index*2)+1);
+}
+
+int getRightChild(int index)
+{
+    return ((index*2)+2);
+}
+int getSibiling(int index)
+{
+    
+    if(index%2 ==0)
+        return index-1;
+    else 
+        return index+1;
+}
+void setTreeAllocated(int root)
+{
+    if(root>2047)
+      return;
+
+    allocationArray[root].allocated =true;
+    setTreeAllocated(getLeftChild(root));
+    setTreeAllocated(getRightChild(root));
+}
+void setTreeUnallocated(int root)
+{
+    if(root>2047)
+      return;
+
+    allocationArray[root].allocated =false;
+    setTreeAllocated(getLeftChild(root));
+    setTreeAllocated(getRightChild(root));
+}
+
+int getTheINDEX()
+{
+    int index = ceil(log2(temp.memSize));
+    index = pow(2,index);
+    index = (1024/index)-1;
+    int sindex = index;
+    int TS = allocationArray[index].TotalSize ;
+    while(TS == allocationArray[index].TotalSize)
+    {
+        if(allocationArray[index].allocated)
+        {
+            if(!allocationArray[getSibiling(index)].allocated)
+            {
+                index = getSibiling(index); 
+                return index;
+            }
+            index++;
+        }
+        index++;
+    }
+    index = sindex;
+    while(TS == allocationArray[index].TotalSize)
+    {
+        if(!allocationArray[index].allocated)
+        {
+            return index;
+        }
+        index++;
+    }
+    return -1;
+    
+}
+
+void merge(int index)
+{
+    if(index <= 0)
+        return;
+
+    
+    if(allocationArray[getSibiling(index)].allocated ==false)
+    {
+            int parent = getParent(index);
+            allocationArray[parent].allocated =false;
+            merge(parent);
+    }
+}
 

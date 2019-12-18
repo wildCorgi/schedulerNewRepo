@@ -57,7 +57,16 @@ typedef struct PCB
     int mEnd;
 } PCB;
 
+typedef struct Alloc 
+{
+    int TotalSize;
+    //int nAllocated;
+    pid_t pid;
+    bool allocated;
+    int start ;
+    int end;
 
+}Alloc;
 
 typedef struct msgPBuff
 {

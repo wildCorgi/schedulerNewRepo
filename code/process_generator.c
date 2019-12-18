@@ -10,7 +10,9 @@ void sendAlgoNumber(int algoMsgID, int schedulingAlgo);
 void schedulerDone(int);
 int main(int argc, char *argv[])
 {
+
     signal(SIGINT, clearResources);
+    
     int schedulingAlgo = -1;
     int quantum = 0;
     int processesNumber = 0 ;
