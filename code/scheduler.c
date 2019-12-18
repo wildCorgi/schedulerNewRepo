@@ -222,6 +222,7 @@ void doRR()
                     { 
 
                         setStartState();
+                        lastT = y;
                         char str[64];
                         sprintf(str, "%d", temp.remainingTime);
                         writeStartState();
@@ -229,6 +230,7 @@ void doRR()
                     }
 
                     setStartState();
+                    lastT = y;
                     if(quantum < temp.remainingTime)
                     { 
                         alarm(quantum);
@@ -565,6 +567,7 @@ void alarmREC(int signnum)
 
                             alarm(0);
                             setPauseState();
+                            temp.remainingTime -= (y-lastT);
                             writePauseState();
                             enqueue(pq,temp);
                             kill(temp.forkID,SIGSTOP);  
