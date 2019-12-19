@@ -1,4 +1,3 @@
-
 #include "headers.h"
 #include "queue.c"
 int processMsgID;
@@ -12,7 +11,6 @@ int main(int argc, char *argv[])
 {
 
     signal(SIGINT, clearResources);
-    
     int schedulingAlgo = -1;
     int quantum = 0;
     int processesNumber = 0 ;

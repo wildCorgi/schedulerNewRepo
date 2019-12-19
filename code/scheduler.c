@@ -19,6 +19,9 @@ int totalRTime = 0;
 double TWTA = 0;
 int totalWaiting = 0;
 double deviation =0;
+int idle =0;
+int iFinish = 0;
+int iStart = 0;
 node * looper;
 struct PCB  temp;
 FILE *outputFile;
@@ -68,8 +71,9 @@ void doRR();
 int main(int argc, char *argv[])
 {
             signal(SIGUSR1,processDone);
-            signal(SIGCHLD,SIG_IGN);
             signal(SIGALRM,alarmREC);
+            signal(SIGCHLD,SIG_IGN);
+        
             pq = createQueue();
             npq = createNQueue();
             allocationArray  = (Alloc*)malloc(2047* sizeof(Alloc)); 
@@ -77,7 +81,9 @@ int main(int argc, char *argv[])
             //TODO implement the scheduler :)
             //upon termination release the clock resources
             initClk();    
+            
             createAllocationArray();
+
             createMessageQueue(&processID, processQueueID);
             
             algo = atoi(argv[1]);
@@ -124,7 +130,7 @@ void doHPF()
     
     while(finishedProcesses!=processesNumber)
     {
-        x=getClk();
+        y=getClk();
         if(pq->count != 0)
         {
 
@@ -162,7 +168,7 @@ void doSRTN()
     while(finishedProcesses!=processesNumber)
     {
             smallerRecieved = false;
-            x = getClk();
+            y = getClk();
 
             if(pq->count != 0 )    
             {  
@@ -220,14 +226,14 @@ void doRR()
    
     while(finishedProcesses!=processesNumber)
     {
-            x = getClk();
+            y = getClk();
 
             if(pq->count != 0)    
             {  
 
                 temp = (pq->front->data)  ;   
                 dequeue(pq);
-                x = getClk();
+            
                 if(!temp.forked)
                 {   
                     temp.forked = true;
@@ -241,7 +247,7 @@ void doRR()
                     { 
 
                         setStartState();
-                        lastT = x;
+                        lastT = y;
                         char str[64];
                         sprintf(str, "%d", temp.remainingTime);
                         writeStartState();
@@ -258,7 +264,7 @@ void doRR()
                 }
                 else
                 {
-                    lastT = x;
+                    lastT = y;
                     setResumeState();
                     writeResumeState();
                     if(quantum < temp.remainingTime)
@@ -357,7 +363,6 @@ void writeFinishState()
             sprintf(printString1,"At time %d deallocated %d bytes for process %d from %d to %d\n",y,temp.memSize,temp.processID,temp.mStart,temp.mEnd); 
             fwrite(printString1, sizeof(char), strlen(printString1), outputFile2);
             fclose(outputFile2);
-            full =false;
     }
                     char printString[200];
                     outputFile = fopen("./scheduler.log", "a");
@@ -399,14 +404,16 @@ void writeFinalState()
                     deviation = sqrt(deviation/count);
                     char printString[200];
                     outputFile1 = fopen("./scheduler.perf", "a");
-                    sprintf(printString,"CPU Utilization = %.2f %% \nAvg WTA = %.2f\nAvg Waiting = %.2f\nStd WTA = %.2f \n",((double)totalRTime/(double)y)*100,ATWA,((double)totalWaiting/(double)processesNumber),deviation); 
+                    sprintf(printString,"CPU Utilization = %.2f %% \nAvg WTA = %.2f\nAvg Waiting = %.2f\nStd WTA = %.2f \n",((double)(totalRTime)/(double)(y-idle))*100,ATWA,((double)totalWaiting/(double)processesNumber),deviation); 
                     fwrite(printString, sizeof(char), strlen(printString), outputFile1);
                     fclose(outputFile1); 
                                     
 }
 void setStartState()
 {
+                    
                     y = getClk();
+                    iStart = y; 
                     lastT=y;
                     totalRTime += temp.runTime;
                     temp.state = stateStarted;                   
@@ -424,6 +431,8 @@ void setStartState()
 void setFinishState()
 {
                     y = getClk();
+                    idle += iStart - iFinish;
+                    iFinish = y;
                     deAllocate();
                     finishedProcesses++;
                     temp.state = stateFinished;
@@ -433,7 +442,11 @@ void setFinishState()
                     temp.WTA = ((double)(temp.TA)/(double)(temp.runTime)) ;
                     TWTA+=temp.WTA;
                     //temp.waitingTime = y-temp.lastStoppedTime-temp.runTime;
-                    temp.waitingTime=y-temp.arrivalTime-temp.runTime;
+                   // temp.waitingTime += (y - temp.lastStoppedTime);
+                    if((temp.finishTime - temp.startTime)>0)
+                    {
+                        temp.waitingTime += (y - (temp.lastStoppedTime+temp.runTime));
+                    }
                     totalWaiting += temp.waitingTime;
                     enqueueN(npq,temp.WTA);
 }
